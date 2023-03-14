@@ -1,0 +1,39 @@
+trigger:
+- {{ branch }}
+
+resources:
+- repo: self
+
+variables:
+  ACR.ImageName: '$(ACR.Name):$(Build.BuildId)'
+  ACR.FullName: '$(ACR.Name).azurecr.io'
+  ACR.Sku: 'Standard'
+  Azure.CreateResources: 'true' 
+  System.Debug: 'false'
+jobs:
+
+- job: BuildImage
+  displayName: Build
+  dependsOn: CreateResources
+  condition: or(succeeded(), ne(variables['Azure.CreateResources'], 'true'))
+
+  pool:
+    {{ pool }}
+
+  steps:
+  - task: Docker@1
+    displayName: 'Build an image'
+    inputs:
+      azureSubscriptionEndpoint: '$(Azure.ServiceConnectionId)'
+      azureContainerRegistry: '$(ACR.FullName)'
+      imageName: '$(ACR.ImageName)'
+      command: build
+      dockerFile: '**/Dockerfile'
+
+  - task: Docker@1
+    displayName: 'Push an image'
+    inputs:
+      azureSubscriptionEndpoint: '$(Azure.ServiceConnectionId)'
+      azureContainerRegistry: '$(ACR.FullName)'
+      imageName: '$(ACR.ImageName)'
+      command: push

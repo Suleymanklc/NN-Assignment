@@ -1,0 +1,87 @@
+resources:
+  repositories:
+    containers:
+    - container: nnfunctionacr  
+      type: ACR
+      subscription: NN
+      registry: nnfunctionacr
+      image: "nn-service-plan"
+      trigger: 
+        tags:
+          include: 
+          - :v*
+        location: 
+        - west-EU
+variables:
+  root_directory: 'terraform'
+  azure_service_connection_name: 'xxxx'
+  tfstate_storage_resource_group_name: 'nn-rg'
+  tfstate_storage_name: ''
+  tfstate_storage_container_name: 'azurefunction' 
+  tfstate_storage_stateblob_name: 'xxx'
+
+
+parameters:
+- name: PlanOnly
+  displayName: Do you want to execute Terraform plan only?
+  default: 'YES'
+  values:
+    - 'YES'
+    - 'NO'
+
+stages:
+
+- stage: Tf_infra
+  displayName: TF infrastructure provisioning
+  jobs:
+  - job: Tf_infra
+    displayName: TF infrastructure provisioning
+    pool: '$(agents_pool_name)'
+
+    steps:
+
+    - task: ms-devlabs.custom-terraform-tasks.custom-terraform-installer-task.TerraformInstaller@0
+      displayName: 'Install Terraform 1.3.9'
+      inputs:
+        terraformVersion: 1.3.9
+
+    - task: TerraformTaskV2@2
+      condition: succeeded()
+      displayName: 'Terraform : init'
+      inputs:
+        workingDirectory: $(root_directory)
+        backendServiceArm: $(azure_service_connection_name)
+        backendAzureRmResourceGroupName: '$(tfstate_storage_resource_group_name)'
+        backendAzureRmStorageAccountName: '$(tfstate_storage_name)'
+        backendAzureRmContainerName: '$(tfstate_storage_container_name)'
+        backendAzureRmKey: '$(tfstate_storage_stateblob_name)'
+        provider: 'azurerm'
+
+    - task: TerraformTaskV2@2
+      condition: succeeded()
+      displayName: 'Terraform : validate'
+      inputs:
+        command: validate
+        workingDirectory: $(root_directory)
+        environmentServiceNameAzureRM: $(azure_service_connection_name)
+        provider: 'azurerm'
+
+    - task: TerraformTaskV2@2
+      condition: succeeded()
+      displayName: 'Terraform : plan'
+      inputs:
+        command: plan
+        workingDirectory: $(root_directory)
+        commandOptions: '-var-file="vars/variable.tfvars"'
+        environmentServiceNameAzureRM: $(azure_service_connection_name)
+        provider: 'azurerm'
+
+    - task: TerraformTaskV2@2
+      condition: and(succeeded(), eq('${{ parameters.PlanOnly }}','NO'))
+      displayName: 'Terraform : apply'
+      inputs:
+        command: apply
+        workingDirectory: $(root_directory)
+        commandOptions: '-auto-approve'
+        environmentServiceNameAzureRM: $(azure_service_connection_name)
+        provider: 'azurerm'

@@ -1,0 +1,21 @@
+provider "azurerm" {
+  skip_provider_registration = true
+  features {}
+}
+
+terraform {
+
+  #backend "local" {} 
+  backend "local" {
+    path = "tfstate/terraform.tfstate"
+  }
+
+  required_version = "~>1.3"
+
+  required_providers {
+    azurerm = {
+      source = "hashicorp/azurerm"
+      version = "=3.44.1"
+    }                       
+  }
+}
